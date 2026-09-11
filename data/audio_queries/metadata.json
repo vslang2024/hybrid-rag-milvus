@@ -1,0 +1,12 @@
+[
+  {
+    "source": "query_python_length.wav",
+    "spoken_text": "How long can a python grow?",
+    "why_its_there": "A spoken version of the text question whose answer only exists in doc12_audio.wav. Exercises the full audio-in -> audio-sourced-answer path."
+  },
+  {
+    "source": "query_err_4521.wav",
+    "spoken_text": "What should I do when I see error code E R R dash 4 5 2 1?",
+    "why_its_there": "The error code is spelled out letter by letter. Checks that transcribe_query() normalizes it to 'ERR-4521' so the BM25 keyword leg still finds doc5 and doc11_audio."
+  }
+]

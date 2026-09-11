@@ -1,0 +1,7 @@
+[
+  {
+    "source": "query_checkout_outage.mp4",
+    "what_it_shows": "A mock screen recording: the checkout page loads, then a 'Connection failed / ERR-4521' dialog appears, while the user says 'Hey, I keep seeing this on the checkout page. What caused it and how was it fixed?'",
+    "why_its_there": "The question is only spoken, and the error code is only on screen — Gemini must combine both to form the query. Expected to retrieve doc15_video (root cause + fix) first, alongside the ERR-4521 text/audio/image docs."
+  }
+]

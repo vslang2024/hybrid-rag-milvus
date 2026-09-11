@@ -1,0 +1,42 @@
+[
+  {
+    "id": "doc1",
+    "text": "Python is a high-level programming language known for its readable syntax. Developers use decorators to modify the behavior of functions without changing their source code."
+  },
+  {
+    "id": "doc2",
+    "text": "The reticulated python is one of the longest snakes in the world, native to Southeast Asia. It is a non-venomous constrictor that ambushes prey near water sources."
+  },
+  {
+    "id": "doc3",
+    "text": "Java is an object-oriented programming language that runs on the Java Virtual Machine, making it portable across different operating systems."
+  },
+  {
+    "id": "doc4",
+    "text": "A cup of coffee in the morning helps many people feel alert. Java is also a nickname for coffee, originating from the Indonesian island where coffee beans were grown."
+  },
+  {
+    "id": "doc5",
+    "text": "Error code ERR-4521 indicates a database connection timeout. To resolve it, verify that the database host is reachable and that connection pool limits have not been exceeded."
+  },
+  {
+    "id": "doc6",
+    "text": "When an application cannot reach its database, users typically experience slow page loads or failed requests. Restarting the connection pool often resolves transient issues."
+  },
+  {
+    "id": "doc7",
+    "text": "Vector embeddings represent text as points in a high-dimensional space so that semantically similar pieces of text end up close together, enabling similarity search."
+  },
+  {
+    "id": "doc8",
+    "text": "Neural networks are computing systems loosely inspired by the human brain, made up of layers of interconnected nodes that learn patterns from data."
+  },
+  {
+    "id": "doc9",
+    "text": "To make a simple omelette, whisk two eggs with a pinch of salt, pour into a hot buttered pan, and fold once the edges start to set."
+  },
+  {
+    "id": "doc10",
+    "text": "Product SKU-88213-XL was flagged for a shipping delay due to a warehouse inventory mismatch in the northeast distribution center."
+  }
+]

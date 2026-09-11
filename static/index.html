@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hybrid RAG chat</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1a1d21; --muted:#6b7280; --accent:#2563eb; --audio:#7c3aed; --border:#e5e7eb; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:14px 20px; background:var(--card); border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:16px; margin:0; }
+  header button { font-size:13px; }
+  main { max-width: 820px; margin: 0 auto; padding: 20px; display:flex; flex-direction:column; gap:14px; }
+  .msg { padding:12px 14px; border-radius:12px; max-width:90%; white-space:pre-wrap; }
+  .user { align-self:flex-end; background:var(--accent); color:#fff; }
+  .user.audio { background:var(--audio); }
+  .user.image { background:#0f766e; } .user img { max-width:320px; border-radius:8px; display:block; margin-top:6px; }
+  .user.video { background:#b45309; } .user video { max-width:320px; border-radius:8px; display:block; margin-top:6px; }
+  .user small { display:block; opacity:.8; font-size:12px; margin-bottom:4px; }
+  .bot { align-self:flex-start; background:var(--card); border:1px solid var(--border); }
+  .bot details { margin-top:8px; color:var(--muted); font-size:13px; }
+  .bot li { margin:4px 0; } .tag { font-family:monospace; font-size:12px; padding:1px 6px; border-radius:6px; background:#eef2ff; color:#3730a3; }
+  .tag.audio { background:#f3e8ff; color:#6b21a8; }
+  .tag.image { background:#ccfbf1; color:#115e59; }
+  .tag.video { background:#fef3c7; color:#92400e; }
+  .err { color:#b91c1c; }
+  form { position:sticky; bottom:0; background:var(--bg); padding:12px 0; display:flex; gap:8px; }
+  input[type=text] { flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-size:15px; }
+  button { padding:10px 14px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; font-size:15px; }
+  button.alt { background:var(--audio); } button.rec { background:#dc2626; } button.img { background:#0f766e; } button.vid { background:#b45309; }
+  button:disabled { opacity:.5; cursor:default; }
+  input[type=file] { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hybrid RAG chat &mdash; Gemini + Milvus Lite</h1>
+  <button id="ingest" class="alt" title="Rebuild the index from data/">Re-index data</button>
+</header>
+<main id="log"></main>
+<main>
+  <form id="f">
+    <input id="q" type="text" placeholder="Type a question, upload audio/image/video, or hold the mic…" autocomplete="off">
+    <button type="submit" id="send">Send</button>
+    <label><button type="button" class="alt" id="uploadBtn">Upload audio</button><input id="file" type="file" accept="audio/*"></label>
+    <label><button type="button" class="img" id="imgBtn" title="Any typed text is sent as a caption">Upload image</button><input id="imgFile" type="file" accept="image/*"></label>
+    <label><button type="button" class="vid" id="vidBtn" title="Any typed text is sent as a caption">Upload video</button><input id="vidFile" type="file" accept="video/*"></label>
+    <button type="button" class="alt" id="mic">🎤 Hold to talk</button>
+  </form>
+</main>
+<script>
+const log = document.getElementById('log');
+const form = document.getElementById('f'), q = document.getElementById('q');
+const fileIn = document.getElementById('file'), micBtn = document.getElementById('mic');
+const imgIn = document.getElementById('imgFile'), vidIn = document.getElementById('vidFile');
+const buttons = [...document.querySelectorAll('button')];
+
+function esc(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function add(cls, html){ const d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html; log.appendChild(d); d.scrollIntoView({behavior:'smooth'}); return d; }
+function busy(b){ buttons.forEach(x => x.disabled = b); }
+
+function hitLine(h){
+  let sc = `hybrid #${h.hybrid_rank}`;
+  if (h.rerank_score !== undefined) sc += ` · rerank ${h.rerank_score.toFixed(1)}/10`;
+  return `<li><span class="tag ${h.modality}">${h.modality}:${esc(h.source)}</span> <b>${esc(h.doc_id)}</b> <span class="tag">${sc}</span> — ${esc(h.text)}</li>`;
+}
+function renderAnswer(el, r){
+  const reranked = r.retrieved.some(h => h.rerank_score !== undefined);
+  let html = `${esc(r.answer)}<details><summary>${reranked ? 'Re-ranked' : 'Retrieved'} ${r.retrieved.length} chunks</summary><ol>${r.retrieved.map(hitLine).join('')}</ol></details>`;
+  if (reranked && r.candidates) {
+    const dropped = r.candidates.filter(c => !r.retrieved.some(h => h.doc_id === c.doc_id));
+    html += `<details><summary>Hybrid candidate pool: ${r.candidates.length} (${dropped.length} dropped by re-ranker)</summary><ol>${r.candidates.map(hitLine).join('')}</ol></details>`;
+  }
+  el.innerHTML = html;
+}
+
+async function ask(url, opts, userHtml, kind=''){
+  add('user ' + kind, userHtml);
+  const bot = add('bot', '…thinking'); busy(true);
+  try {
+    const res = await fetch(url, opts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    renderAnswer(bot, data);
+    if (kind) bot.insertAdjacentHTML('afterbegin', `<small style="color:var(--muted)">${kind==='audio'?'Heard':'Interpreted'}: “${esc(data.question)}”</small><br>`);
+  } catch (e) { bot.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  finally { busy(false); q.focus(); }
+}
+
+q.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); } });
+form.addEventListener('submit', e => {
+  e.preventDefault(); const text = q.value.trim(); if (!text) return; q.value='';
+  ask('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question:text})}, esc(text));
+});
+
+function sendAudio(blob, name){
+  const fd = new FormData(); fd.append('file', blob, name);
+  const url = URL.createObjectURL(blob);
+  ask('/api/chat/audio', {method:'POST', body: fd}, `<small>🎤 ${esc(name)}</small><audio controls src="${url}"></audio>`, 'audio');
+}
+function sendMedia(file, kind){
+  const caption = q.value.trim(); q.value = '';
+  const fd = new FormData(); fd.append('file', file, file.name); fd.append('question', caption);
+  const url = URL.createObjectURL(file);
+  const preview = kind === 'image' ? `<img src="${url}" alt="">` : `<video controls src="${url}"></video>`;
+  ask(`/api/chat/${kind}`, {method:'POST', body: fd},
+      `<small>${kind==='image'?'🖼':'🎬'} ${esc(file.name)}</small>${caption ? esc(caption) : ''}${preview}`, kind);
+}
+document.getElementById('imgBtn').onclick = () => imgIn.click();
+imgIn.onchange = () => { if (imgIn.files[0]) { sendMedia(imgIn.files[0], 'image'); imgIn.value=''; } };
+document.getElementById('vidBtn').onclick = () => vidIn.click();
+vidIn.onchange = () => { if (vidIn.files[0]) { sendMedia(vidIn.files[0], 'video'); vidIn.value=''; } };
+document.getElementById('uploadBtn').onclick = () => fileIn.click();
+fileIn.onchange = () => { if (fileIn.files[0]) { sendAudio(fileIn.files[0], fileIn.files[0].name); fileIn.value=''; } };
+
+// Push-to-talk with MediaRecorder
+let rec, chunks = [];
+async function startRec(){
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    rec = new MediaRecorder(stream); chunks = [];
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); sendAudio(new Blob(chunks, {type: rec.mimeType}), 'recording.webm'); };
+    rec.start(); micBtn.classList.add('rec'); micBtn.textContent = '● Recording… release to send';
+  } catch (e) { add('bot', `<span class="err">Mic unavailable: ${esc(e.message)}</span>`); }
+}
+function stopRec(){ if (rec && rec.state === 'recording') rec.stop(); micBtn.classList.remove('rec'); micBtn.textContent = '🎤 Hold to talk'; }
+micBtn.addEventListener('mousedown', startRec); micBtn.addEventListener('mouseup', stopRec); micBtn.addEventListener('mouseleave', stopRec);
+micBtn.addEventListener('touchstart', e => { e.preventDefault(); startRec(); }); micBtn.addEventListener('touchend', e => { e.preventDefault(); stopRec(); });
+
+document.getElementById('ingest').onclick = async () => {
+  if (!confirm('Rebuild the index from data/? This transcribes + embeds everything again.')) return;
+  const bot = add('bot', 'Re-indexing…'); busy(true);
+  try { const r = await fetch('/api/ingest', {method:'POST'}); const d = await r.json(); bot.textContent = `Indexed ${d.indexed} documents.`; }
+  catch (e) { bot.innerHTML = `<span class="err">${esc(e.message)}</span>`; } finally { busy(false); }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+[
+  {
+    "source": "query_error_popup.png",
+    "what_it_shows": "A mock error popup reading 'ERR-4521 - The application could not reach the database.'",
+    "why_its_there": "A user screenshots an error and asks about it. Run twice in main.py: once with no caption (Gemini infers the question) and once with the caption 'How do I fix this?'. Both should surface doc5 (text), doc11_audio (audio) and doc13_image (image) via the ERR-4521 keyword."
+  }
+]

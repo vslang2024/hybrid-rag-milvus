@@ -1,0 +1,9 @@
+pymilvus[milvus_lite]>=2.5.0
+google-genai>=0.3.0
+langgraph>=0.2.0
+python-dotenv>=1.0.0
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pillow>=10.0  # only for make_sample_images.py
+imageio-ffmpeg>=0.5  # only for make_sample_videos.py

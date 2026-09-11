@@ -1,0 +1,14 @@
+[
+  {
+    "id": "doc11_audio",
+    "source": "doc11_audio.wav",
+    "expected_transcript": "Attention team. We are seeing repeated reports of error code ERR-4521. This means the database connection has timed out. Please check that the database host is reachable.",
+    "why_its_there": "A spoken alert repeating the ERR-4521 error code that already appears in doc5 (text). Reinforces the same fact from a second modality, so BM25 matching a code from a transcript (not typed text) can be demonstrated."
+  },
+  {
+    "id": "doc12_audio",
+    "source": "doc12_audio.wav",
+    "expected_transcript": "Did you know that some pythons can grow to over twenty feet long? The reticulated python is native to southeast asia and hunts near rivers and streams.",
+    "why_its_there": "A spoken fact ('over twenty feet long') that does NOT appear anywhere in doc2 (the text doc about pythons). This is the one piece of information that only exists in audio, so retrieving it proves the audio ingestion path is actually contributing answers, not just riding along unused."
+  }
+]

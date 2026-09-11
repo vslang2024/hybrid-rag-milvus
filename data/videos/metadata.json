@@ -1,0 +1,14 @@
+[
+  {
+    "id": "doc15_video",
+    "source": "doc15_video.mp4",
+    "what_it_shows": "Narrated incident-review slideshow for ERR-4521: checkout API down 18 minutes on March 3rd; root cause = connection pool exhausted at its limit of 50 during a marketing traffic spike; fix = pool raised to 200 plus an alert at 80% usage.",
+    "why_its_there": "doc5/doc11/doc13 all say what ERR-4521 means and how to check it, but the actual root cause and the fix (50 -> 200 pool size) exist ONLY in this video — proving video ingestion contributes answers. Facts appear both spoken and on-screen."
+  },
+  {
+    "id": "doc16_video",
+    "source": "doc16_video.mp4",
+    "what_it_shows": "Narrated slideshow of reticulated python facts, including the record holder Medusa measured at 25 feet 2 inches in 2011.",
+    "why_its_there": "A specific record (Medusa, 25 ft 2 in) that appears in no text, audio or image doc. Also a semantic neighbour of doc2 and doc12_audio, so it tests ranking across modalities on the same topic."
+  }
+]

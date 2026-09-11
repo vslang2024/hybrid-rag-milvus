@@ -1,0 +1,14 @@
+[
+  {
+    "id": "doc13_image",
+    "source": "doc13_image.png",
+    "what_it_shows": "A mock 'Connection failed' dialog: ERR-4521, database connection timed out after 30 seconds, host db-prod-01.internal port 5432.",
+    "why_its_there": "Repeats the ERR-4521 code from doc5/doc11 in a third modality, and adds details (30-second timeout, host name) that exist only in the image."
+  },
+  {
+    "id": "doc14_image",
+    "source": "doc14_image.png",
+    "what_it_shows": "A mock warehouse inventory report for SKU-88213-XL: Rotterdam DC-3, expected 120, counted 97, discrepancy -23, status SHIPPING DELAYED.",
+    "why_its_there": "doc10 (text) only says the SKU was delayed due to an inventory mismatch. The actual numbers (120 expected / 97 counted) exist ONLY in this image — proving image ingestion contributes answers."
+  }
+]
