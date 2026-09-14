@@ -1,8 +1,10 @@
 """
 Milvus Lite hybrid (dense + BM25) vector store helper.
 
-Milvus Lite runs embedded, no server to install — the "database" is just a
-local file (hybrid_rag.db). One collection holds these fields per row:
+By default Milvus Lite runs embedded, no server to install — the "database"
+is just a local file (hybrid_rag.db). Set MILVUS_ADDRESS=http://host:19530 to
+point the exact same code at Milvus Standalone (see docker-compose.yml).
+One collection holds these fields per row:
   - the raw text (for text docs), a Gemini transcript (audio) or a Gemini
     description incl. visible/spoken text (image, video)
   - modality: "text", "audio", "image" or "video" — so you know where a result came from
@@ -24,6 +26,8 @@ lists with Reciprocal Rank Fusion (RRF), so you get one final ranking that
 benefits from both signals.
 """
 
+import os
+
 from pymilvus import (
     MilvusClient,
     DataType,
@@ -37,9 +41,42 @@ COLLECTION_NAME = "hybrid_docs"
 DENSE_DIM = 768  # Gemini "text-embedding-004" output dimension
 
 
-def get_client(db_path: str = "hybrid_rag.db") -> MilvusClient:
-    """Milvus Lite: just a local file path, no server/Docker needed."""
-    return MilvusClient(db_path)
+DEFAULT_URI = "hybrid_rag.db"
+
+
+def get_client(uri: str | None = None) -> MilvusClient:
+    """
+    Connects to Milvus. The same code talks to two very different backends:
+
+      - a local file path  ("hybrid_rag.db")     -> Milvus Lite, embedded in this
+        process, no server needed. Single-process only.
+      - a server URI       ("http://localhost:19530", "http://milvus:19530")
+        -> Milvus Standalone / cluster / Zilliz Cloud. Many clients at once.
+
+    Resolution order: explicit `uri` arg -> MILVUS_ADDRESS env var -> DEFAULT_URI.
+    MILVUS_TOKEN (e.g. "root:Milvus" or a Zilliz API key) is passed if set.
+    (The env var is deliberately NOT called MILVUS_URI: pymilvus reads that
+    name itself for its ORM default connection and rejects file paths in it.)
+    """
+    uri = uri or os.environ.get("MILVUS_ADDRESS") or DEFAULT_URI
+    token = os.environ.get("MILVUS_TOKEN", "")
+    return MilvusClient(uri=uri, token=token) if token else MilvusClient(uri=uri)
+
+
+def is_lite(client: MilvusClient) -> bool:
+    """True when the client is backed by an embedded Milvus Lite file."""
+    uri = os.environ.get("MILVUS_ADDRESS") or DEFAULT_URI
+    return not uri.startswith(("http://", "https://", "tcp://", "unix:"))
+
+
+def ensure_loaded(client: MilvusClient):
+    """
+    Loads the collection into memory if it exists. Needed whenever a
+    collection was created by another process (server.py / inspect_db.py
+    opening a Lite file, or any client against Standalone).
+    """
+    if client.has_collection(COLLECTION_NAME):
+        client.load_collection(COLLECTION_NAME)
 
 
 def create_collection(client: MilvusClient, drop_existing: bool = True):

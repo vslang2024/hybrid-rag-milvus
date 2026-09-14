@@ -312,9 +312,11 @@ def rerank(client: genai.Client, question: str, candidates: list[str], top_n: in
 def generate_answer(client: genai.Client, question: str, context_chunks: list[str]) -> str:
     context = "\n\n".join(f"[{i+1}] {c}" for i, c in enumerate(context_chunks))
     prompt = (
-        "Answer the question using ONLY the context below. "
-        "Cite sources like [1], [2] where relevant. "
-        "If the context doesn't contain the answer, say so.\n\n"
+        "Answer the question using ONLY the information in the context below. "
+        "The context may phrase things differently from the question — use any "
+        "passage that addresses the same code, product, event or topic, and "
+        "cite sources like [1], [2]. Only say the context lacks the answer if "
+        "no passage is relevant at all.\n\n"
         f"Context:\n{context}\n\nQuestion: {question}\nAnswer:"
     )
     response = client.models.generate_content(model=CHAT_MODEL, contents=prompt)

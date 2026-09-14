@@ -111,9 +111,11 @@ def load_video_docs(genai_client):
 
 def main():
     genai_client = gemini_client.get_client()
-    milvus_client = milvus_store.get_client("hybrid_rag.db")
+    milvus_client = milvus_store.get_client()   # MILVUS_ADDRESS env var, or local hybrid_rag.db
+    print(f"Milvus: {os.environ.get('MILVUS_ADDRESS') or milvus_store.DEFAULT_URI} "
+          f"({'Lite, embedded' if milvus_store.is_lite(milvus_client) else 'server'})")
 
-    print("Creating Milvus Lite collection (dense + BM25 sparse)...")
+    print("Creating Milvus collection (dense + BM25 sparse)...")
     milvus_store.create_collection(milvus_client, drop_existing=True)
 
     text_docs = load_text_docs()
@@ -205,7 +207,8 @@ def print_result(result: dict):
         scores = f"hybrid#{hit['hybrid_rank']} rrf={hit['score']:.4f}"
         if "rerank_score" in hit:
             scores += f" rerank={hit['rerank_score']:.1f}"
-        print(f"  [{hit['doc_id']}] ({tag}) {scores}  {hit['text'][:70]}...")
+        preview = " ".join(hit["text"].split())[:70]
+        print(f"  [{hit['doc_id']}] ({tag}) {scores}  {preview}...")
     print(f"\nAnswer: {result['answer']}")
 
 

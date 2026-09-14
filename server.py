@@ -10,11 +10,13 @@ microphone. Both paths go through the same graph as main.py:
     image -> /api/chat/image  -> {"question_image": <temp file>, "question": <caption>}
     video -> /api/chat/video  -> {"question_video": <temp file>, "question": <caption>}
 
-The server reuses the existing hybrid_rag.db built by main.py. Run main.py
-once first (or POST /api/ingest) to populate it.
+The server reuses the collection built by main.py — in local hybrid_rag.db
+(Milvus Lite) by default, or in Milvus Standalone when MILVUS_ADDRESS is set.
+Run main.py once first (or POST /api/ingest) to populate it.
 
 Usage:
-    uvicorn server:app --reload
+    uvicorn server:app --reload                       # Milvus Lite
+    MILVUS_ADDRESS=http://localhost:19530 uvicorn server:app   # Milvus Standalone
     open http://127.0.0.1:8000
 """
 
@@ -32,7 +34,6 @@ import milvus_store
 from graph import build_graph
 from main import load_audio_docs, load_image_docs, load_text_docs, load_video_docs
 
-DB_PATH = "hybrid_rag.db"
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 state: dict = {}  # holds the clients + compiled graph for the process lifetime
@@ -41,12 +42,11 @@ state: dict = {}  # holds the clients + compiled graph for the process lifetime
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state["genai"] = gemini_client.get_client()
-    state["milvus"] = milvus_store.get_client(DB_PATH)
-    # A DB reopened in a new process starts "released"; load it into memory
-    # so searches work (main.py never hits this because it creates + searches
+    state["milvus"] = milvus_store.get_client()   # MILVUS_ADDRESS env var, or local hybrid_rag.db
+    # A collection created by another process starts "released"; load it so
+    # searches work (main.py never hits this because it creates + searches
     # in the same process).
-    if state["milvus"].has_collection(milvus_store.COLLECTION_NAME):
-        state["milvus"].load_collection(milvus_store.COLLECTION_NAME)
+    milvus_store.ensure_loaded(state["milvus"])
     use_rerank = os.environ.get("RERANK", "1") != "0"   # RERANK=0 uvicorn server:app  -> disable
     state["app"] = build_graph(state["milvus"], state["genai"], rerank=use_rerank)
     yield

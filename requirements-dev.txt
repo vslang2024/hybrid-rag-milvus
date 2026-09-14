@@ -1,0 +1,4 @@
+# Only needed to regenerate the sample media (make_sample_images.py / make_sample_videos.py)
+-r requirements.txt
+pillow>=10.0
+imageio-ffmpeg>=0.5

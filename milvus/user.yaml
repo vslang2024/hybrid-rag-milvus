@@ -1,0 +1,4 @@
+# Extra config to override defaults in Milvus's milvus.yaml.
+# Left empty on purpose — add overrides here if needed, e.g.:
+# proxy:
+#   maxVectorFieldNum: 8

@@ -1,0 +1,59 @@
+# Hybrid RAG with Milvus Standalone (instead of the embedded Milvus Lite file).
+#
+#   docker compose up -d --build                      # start Milvus + chat server
+#   docker compose run --rm app python main.py        # ingest data/ + run the demo queries
+#   open http://localhost:8000                        # chat UI
+#   docker compose run --rm app python inspect_db.py  # look inside the collection
+#   docker compose down            # stop (keeps data in ./volumes/milvus)
+#   docker compose down -v         # stop AND wipe the Milvus data volume
+#
+# Needs GEMINI_API_KEY in ./.env (docker compose reads it automatically).
+
+services:
+  milvus:
+    # Single-container Standalone: embedded etcd + local object storage, so no
+    # separate etcd/MinIO services are needed (mirrors Milvus's standalone_embed.sh).
+    image: milvusdb/milvus:v2.6.4
+    container_name: milvus-standalone
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      DEPLOY_MODE: STANDALONE
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      ETCD_CONFIG_PATH: /milvus/configs/embedEtcd.yaml
+      COMMON_STORAGETYPE: local
+    volumes:
+      - milvus-data:/var/lib/milvus
+      - ./milvus/embedEtcd.yaml:/milvus/configs/embedEtcd.yaml
+      - ./milvus/user.yaml:/milvus/configs/user.yaml
+    ports:
+      - "19530:19530"   # gRPC — what pymilvus connects to
+      - "9091:9091"     # metrics / healthz
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  app:
+    build: .
+    container_name: hybrid-rag-app
+    depends_on:
+      milvus:
+        condition: service_healthy
+    environment:
+      MILVUS_ADDRESS: http://milvus:19530
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      RERANK: ${RERANK:-1}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live-mount data/ so you can drop in new files and hit "Re-index data"
+      # without rebuilding the image.
+      - ./data:/app/data
+
+volumes:
+  milvus-data:
