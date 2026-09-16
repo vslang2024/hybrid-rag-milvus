@@ -26,6 +26,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -47,8 +48,11 @@ async def lifespan(app: FastAPI):
     # searches work (main.py never hits this because it creates + searches
     # in the same process).
     milvus_store.ensure_loaded(state["milvus"])
-    use_rerank = os.environ.get("RERANK", "1") != "0"   # RERANK=0 uvicorn server:app  -> disable
-    state["app"] = build_graph(state["milvus"], state["genai"], rerank=use_rerank)
+    use_rerank = os.environ.get("RERANK", "1") != "0"         # RERANK=0     -> no re-ranker
+    use_guardrails = os.environ.get("GUARDRAILS", "1") != "0" # GUARDRAILS=0 -> no NeMo rails
+    state["app"] = build_graph(
+        state["milvus"], state["genai"], rerank=use_rerank, guardrails=use_guardrails
+    )
     yield
     state.clear()
 
@@ -74,8 +78,10 @@ def _run(inputs: dict) -> dict:
     return {
         "question": result["question"],
         "answer": result["answer"],
-        "retrieved": result["retrieved"],
-        "candidates": result["candidates"],
+        "retrieved": result.get("retrieved", []),
+        "candidates": result.get("candidates", []),
+        "blocked_by": result.get("blocked_by"),
+        "guardrails": result.get("guardrails", []),
     }
 
 
@@ -103,7 +109,7 @@ async def chat_audio(file: UploadFile = File(...)):
         tmp.write(await file.read())
         tmp_path = tmp.name
     try:
-        return _run({"question_audio": tmp_path})
+        return await run_in_threadpool(_run, {"question_audio": tmp_path})
     finally:
         os.unlink(tmp_path)
 
@@ -118,7 +124,8 @@ async def _run_with_file(file: UploadFile, key: str, default_suffix: str, captio
         inputs = {key: tmp_path}
         if caption.strip():
             inputs["question"] = caption.strip()
-        return _run(inputs)
+        # Sync graph (and NeMo's sync generate()) must not run on the event loop.
+        return await run_in_threadpool(_run, inputs)
     finally:
         os.unlink(tmp_path)
 

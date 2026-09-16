@@ -5,3 +5,5 @@ python-dotenv>=1.0.0
 fastapi>=0.110
 uvicorn[standard]>=0.29
 python-multipart>=0.0.9
+nemoguardrails>=0.24
+langchain-google-genai>=4.0

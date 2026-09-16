@@ -1,0 +1,9 @@
+.venv/
+.idea/
+__pycache__/
+*.pyc
+.DS_Store
+hybrid_rag.db/
+volumes/
+.env
+.git/

@@ -1,0 +1,36 @@
+# NeMo Guardrails configuration for the hybrid RAG chat.
+#
+# The main LLM is injected from code (guard.py passes a LangChain
+# ChatGoogleGenerativeAI wrapping the same gemini-flash-latest model the
+# rest of the app uses), so `models` is left empty here.
+#
+# Three rails, all LLM-judged "self check" rails from the NeMo library:
+#   input : self check input   -> blocks jailbreaks / prompt injection / harmful
+#                                 or clearly off-topic requests BEFORE retrieval
+#   output: self check output  -> blocks unsafe or policy-violating answers
+#           self check facts   -> blocks answers not supported by the retrieved
+#                                 chunks (hallucination guard); needs
+#                                 $relevant_chunks + $check_facts from code
+# The prompts for each are in prompts.yml.
+
+models: []
+
+instructions:
+  - type: general
+    content: |
+      You are the assistant for an internal support knowledge base that covers
+      software errors, product/inventory records, and general reference facts
+      stored as text, audio transcripts, image descriptions and video
+      descriptions. Answer only from retrieved context.
+
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output
+      - self check facts
+
+# Temperature used for the rail (judge) calls.
+lowest_temperature: 0.0

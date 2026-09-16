@@ -48,6 +48,7 @@ services:
       MILVUS_ADDRESS: http://milvus:19530
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       RERANK: ${RERANK:-1}
+      GUARDRAILS: ${GUARDRAILS:-1}
     ports:
       - "8000:8000"
     volumes:

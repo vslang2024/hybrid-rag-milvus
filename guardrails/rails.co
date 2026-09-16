@@ -1,0 +1,9 @@
+# Colang 1.0. The `self check input` / `self check output` / `self check facts`
+# flows themselves come from the NeMo Guardrails library; here we only define
+# the refusal messages the app shows when a rail blocks something.
+
+define bot refuse to respond
+  "Sorry, I can't help with that request."
+
+define bot inform answer unknown
+  "I couldn't find a reliable answer to that in the knowledge base."

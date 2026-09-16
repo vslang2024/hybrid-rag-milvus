@@ -24,6 +24,7 @@
   .tag.audio { background:#f3e8ff; color:#6b21a8; }
   .tag.image { background:#ccfbf1; color:#115e59; }
   .tag.video { background:#fef3c7; color:#92400e; }
+  .tag.blocked { background:#fee2e2; color:#991b1b; } .tag.ok { background:#dcfce7; color:#166534; }
   .err { color:#b91c1c; }
   form { position:sticky; bottom:0; background:var(--bg); padding:12px 0; display:flex; gap:8px; }
   input[type=text] { flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-size:15px; }
@@ -66,8 +67,15 @@ function hitLine(h){
   return `<li><span class="tag ${h.modality}">${h.modality}:${esc(h.source)}</span> <b>${esc(h.doc_id)}</b> <span class="tag">${sc}</span> — ${esc(h.text)}</li>`;
 }
 function renderAnswer(el, r){
+  if (r.blocked_by) {
+    el.innerHTML = `<span class="tag blocked">🛑 blocked by guardrail: ${esc(r.blocked_by)}</span><br>${esc(r.answer)}` +
+      (r.guardrails && r.guardrails.length ? `<details><summary>Rails run</summary>${r.guardrails.map(esc).join(', ')}</details>` : '');
+    return;
+  }
   const reranked = r.retrieved.some(h => h.rerank_score !== undefined);
-  let html = `${esc(r.answer)}<details><summary>${reranked ? 'Re-ranked' : 'Retrieved'} ${r.retrieved.length} chunks</summary><ol>${r.retrieved.map(hitLine).join('')}</ol></details>`;
+  let html = `${esc(r.answer)}`;
+  if (r.guardrails && r.guardrails.length) html += `<br><span class="tag ok">✓ guardrails: ${r.guardrails.map(esc).join(', ')}</span>`;
+  html += `<details><summary>${reranked ? 'Re-ranked' : 'Retrieved'} ${r.retrieved.length} chunks</summary><ol>${r.retrieved.map(hitLine).join('')}</ol></details>`;
   if (reranked && r.candidates) {
     const dropped = r.candidates.filter(c => !r.retrieved.some(h => h.doc_id === c.doc_id));
     html += `<details><summary>Hybrid candidate pool: ${r.candidates.length} (${dropped.length} dropped by re-ranker)</summary><ol>${r.candidates.map(hitLine).join('')}</ol></details>`;
