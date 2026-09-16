@@ -39,6 +39,8 @@ class RAGState(TypedDict, total=False):
 
 CANDIDATE_POOL = 10   # how many hybrid hits to hand to the re-ranker
 FINAL_TOP_K = 5       # how many chunks the generator sees
+MIN_RERANK_SCORE = 1  # candidates scoring below this (0-10) are dropped; if none survive, we abstain
+NO_CONTEXT_ANSWER = "I couldn't find anything relevant to that in the knowledge base."
 
 
 def build_graph(milvus_client, genai_client, rerank: bool = True, guardrails: bool = True, guard=None):
@@ -117,15 +119,26 @@ def build_graph(milvus_client, genai_client, rerank: bool = True, guardrails: bo
             hit = dict(candidates[r["index"]])
             hit["rerank_score"] = r["score"]
             retrieved.append(hit)
-        # Drop chunks the re-ranker judged irrelevant (score 0) so the
-        # generator isn't handed keyword-only noise — unless that's all we have.
-        kept = [h for h in retrieved if h["rerank_score"] > 0]
-        return {"retrieved": kept or retrieved}
+        # Drop chunks the re-ranker judged irrelevant. Vector search always
+        # returns *something* (k-nearest, no notion of "no match"), so for an
+        # out-of-scope question every candidate scores ~0. Honour that: hand
+        # the generator nothing rather than keyword-only noise, and let
+        # generate_node abstain without an LLM call.
+        kept = [h for h in retrieved if h["rerank_score"] >= MIN_RERANK_SCORE]
+        return {"retrieved": kept}
 
     def generate_node(state: RAGState) -> RAGState:
         chunks = [h["text"] for h in state["retrieved"]]
+        if not chunks:
+            # Nothing relevant survived retrieval + re-ranking: abstain
+            # deterministically instead of asking the LLM to say "I don't know".
+            return {"answer": NO_CONTEXT_ANSWER}
         answer = gemini_client.generate_answer(genai_client, state["question"], chunks)
         return {"answer": answer}
+
+    def after_generate(state: RAGState) -> str:
+        # No context -> canned abstention -> nothing for the output rails to check.
+        return "guard_output" if state["retrieved"] else "done"
 
     first = "guard_input" if guardrails else "retrieve"   # where a text question starts
 
@@ -174,7 +187,7 @@ def build_graph(milvus_client, genai_client, rerank: bool = True, guardrails: bo
     else:
         graph.add_edge("retrieve", "generate")
     if guardrails:
-        graph.add_edge("generate", "guard_output")
+        graph.add_conditional_edges("generate", after_generate, {"guard_output": "guard_output", "done": END})
         graph.add_edge("guard_output", END)
     else:
         graph.add_edge("generate", END)

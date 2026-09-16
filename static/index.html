@@ -74,6 +74,11 @@ function renderAnswer(el, r){
   }
   const reranked = r.retrieved.some(h => h.rerank_score !== undefined);
   let html = `${esc(r.answer)}`;
+  if (r.retrieved.length === 0 && r.candidates && r.candidates.length) {
+    html += `<br><span class="tag">no relevant context — re-ranker scored all ${r.candidates.length} candidates below threshold; generator skipped</span>`;
+    html += `<details><summary>Hybrid candidate pool: ${r.candidates.length} (all dropped)</summary><ol>${r.candidates.map(hitLine).join('')}</ol></details>`;
+    el.innerHTML = html; return;
+  }
   if (r.guardrails && r.guardrails.length) html += `<br><span class="tag ok">✓ guardrails: ${r.guardrails.map(esc).join(', ')}</span>`;
   html += `<details><summary>${reranked ? 'Re-ranked' : 'Retrieved'} ${r.retrieved.length} chunks</summary><ol>${r.retrieved.map(hitLine).join('')}</ol></details>`;
   if (reranked && r.candidates) {

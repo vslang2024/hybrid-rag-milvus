@@ -207,6 +207,8 @@ What it changes on the sample data (hybrid rank → re-rank score):
 | *What causes the checkout page error ERR-4521 and how can it be fixed?* | doc5, doc15_video, doc11_audio | **doc15_video → 10** (has the root cause), doc5 → 10, doc11_audio → 7, doc13_image → 5, doc6 → 2 |
 | *How long can a python grow?* | doc12_audio, doc16_video, **doc1 (Python lang)** | doc12_audio → 10, doc16_video → 10, doc2 → 3; doc1 and doc9 dropped |
 
+**Out-of-scope questions (abstention).** Retrieval *always* runs, even for "what is today's date?" — vector search is k-nearest-neighbour and has no notion of "no match", so the only way to learn a question is unanswerable is to look. What matters is what happens next: if no candidate reaches `MIN_RERANK_SCORE` (1/10), `retrieved` is empty, `generate` returns a fixed *"I couldn't find anything relevant…"* **without an LLM call**, and the output rails are skipped. That's the standard retrieve → gate → abstain pattern: cheap retrieval produces the evidence, the re-ranker is the gate, and abstention is deterministic. (An off-topic question costs ~3 s: one input-rail call + retrieval + one re-rank call.) The UI labels these answers "no relevant context" and still shows the dropped candidate pool so you can see what the gate rejected.
+
 If you'd rather use a local cross-encoder, `pymilvus[model]` ships `BGERerankFunction` / `CrossEncoderRerankFunction` with the same "score candidates against a query" shape — swap the body of `rerank_node` in `graph.py`.
 
 ## Guardrails (NeMo)
