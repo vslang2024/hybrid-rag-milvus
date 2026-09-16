@@ -14,7 +14,12 @@ except ImportError:
 
 EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIM = 768
-CHAT_MODEL = "gemini-flash-latest"  # supports native audio, image + video input
+CHAT_MODEL = "gemini-flash-latest"       # generation + native audio, image, video understanding
+# Cheaper/faster model for the "judge" style calls: guardrail checks (yes/no)
+# and re-ranking (0-10 scores). ~1s per call vs ~5-10s for the full Flash
+# model, with no measurable quality difference on these short classification
+# tasks. Override with JUDGE_MODEL env var (e.g. =gemini-flash-latest).
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "gemini-flash-lite-latest")
 
 def get_client() -> genai.Client:
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -294,7 +299,7 @@ def rerank(client: genai.Client, question: str, candidates: list[str], top_n: in
         ),
     )
     response = client.models.generate_content(
-        model=CHAT_MODEL,
+        model=JUDGE_MODEL,
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

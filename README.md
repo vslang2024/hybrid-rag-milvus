@@ -3,7 +3,7 @@
 A minimal hybrid retrieval-augmented generation app:
 
 - **Milvus** — Milvus Lite (embedded, just a local `.db` file) for local dev, or **Milvus Standalone in Docker** via the included `docker-compose.yml`; same code, switched by one env var
-- **Google Gemini** — `gemini-embedding-001` for embeddings; `gemini-flash-latest` for generation, re-ranking, and native audio / image / video understanding
+- **Google Gemini** — `gemini-embedding-001` for embeddings; `gemini-flash-latest` for generation and native audio / image / video understanding; `gemini-flash-lite-latest` as the fast "judge" for re-ranking and guardrails
 - **LangGraph** — `[transcribe_question | interpret_image | interpret_video]` → `guard_input` → `retrieve` → `rerank` → `generate` → `guard_output`
 - **NeMo Guardrails** — input rail (jailbreak / harmful / secret-fishing) and output rails (safety + a hallucination check against the retrieved chunks), judged by the same Gemini model
 
@@ -197,7 +197,7 @@ hybrid_search (dense + BM25 → RRF)  →  10 candidates   ═ "Hybrid candidate
         → top-5 with score > 0                        ═ "Re-ranked chunks"  →  generate
 ```
 
-It's an LLM re-ranker using the same Gemini model — no extra dependencies, and because everything is text by this point it works identically across all four modalities. `CANDIDATE_POOL` (10) and `FINAL_TOP_K` (5) live at the top of `graph.py`; `build_graph(rerank=False)` or `RERANK=0` skips the stage.
+It's an LLM re-ranker using Gemini (`JUDGE_MODEL`, Flash-Lite by default — ~1 s per call vs 5–10 s for full Flash, same scores on this data) — no extra dependencies, and because everything is text by this point it works identically across all four modalities. `CANDIDATE_POOL` (10) and `FINAL_TOP_K` (5) live at the top of `graph.py`; `build_graph(rerank=False)` or `RERANK=0` skips the stage.
 
 What it changes on the sample data (hybrid rank → re-rank score):
 
@@ -219,11 +219,11 @@ If you'd rather use a local cross-encoder, `pymilvus[model]` ships `BGERerankFun
 | `guard_output` | `self check output` | LLM judges the answer: no unsafe content, no leaking secrets or the system prompt | Replaces the answer with a refusal |
 | `guard_output` | `self check facts` | **Hallucination guard**: LLM checks whether the answer is supported by the retrieved chunks (passed as `$relevant_chunks`) | Replaces the answer with *"I couldn't find a reliable answer to that in the knowledge base."* |
 
-The judge is the same `gemini-flash-latest` model, wrapped in LangChain's `ChatGoogleGenerativeAI` and injected via `LLMRails(config, llm=…)` (NeMo 0.24 has no built-in Gemini provider; `guard.py` also translates NeMo's `max_tokens` to Gemini's `max_output_tokens`). The policies are plain-English prompts in `guardrails/prompts.yml` — edit those to tighten or loosen the rules; `guardrails/config.yml` lists which rails are on; `guardrails/rails.co` holds the refusal messages.
+The judge is `gemini_client.JUDGE_MODEL` (`gemini-flash-lite-latest` by default; override with the `JUDGE_MODEL` env var), wrapped in LangChain's `ChatGoogleGenerativeAI` and injected via `LLMRails(config, llm=…)` (NeMo 0.24 has no built-in Gemini provider; `guard.py` also translates NeMo's `max_tokens` to Gemini's `max_output_tokens`). The policies are plain-English prompts in `guardrails/prompts.yml` — edit those to tighten or loosen the rules; `guardrails/config.yml` lists which rails are on; `guardrails/rails.co` holds the refusal messages.
 
 Every response reports what happened: `guardrails` (rails that ran) and `blocked_by` (the rail that stopped it, or `null`). The chat UI shows a green "✓ guardrails" tag on allowed answers and a red "🛑 blocked by" tag otherwise. `main.py` includes a prompt-injection test question that should be blocked at `guard_input`. Disable with `GUARDRAILS=0` (env) or `build_graph(guardrails=False)`.
 
-Cost: two extra LLM calls per allowed question (input check, output+facts check), on top of the re-ranker. To swap in NVIDIA's dedicated NemoGuard NIM models or other library rails (jailbreak detection, PII, content safety), add them under `rails:` in `config.yml` — `guard.py` doesn't change.
+Cost: three extra judge calls per allowed question (input check; output check + facts check) — about 2.5 s total with Flash-Lite. A full question (rails + re-rank + generate) runs in ~12–15 s; with full Flash as the judge it was ~35 s, which is why the judge model is separate from the generation model. To swap in NVIDIA's dedicated NemoGuard NIM models or other library rails (jailbreak detection, PII, content safety), add them under `rails:` in `config.yml` — `guard.py` doesn't change.
 
 ## Chat server (browser UI + API)
 

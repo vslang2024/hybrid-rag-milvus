@@ -12,8 +12,9 @@ Why guardrails on a RAG app?
 
 NeMo Guardrails normally drives the whole conversation itself; here we use
 it as a library and run ONLY the rails (dialog/retrieval rails disabled),
-keeping LangGraph in charge of the pipeline. The judge LLM is the same
-Gemini model as the rest of the app, wrapped in LangChain so NeMo can call it.
+keeping LangGraph in charge of the pipeline. The judge LLM is Gemini
+(gemini_client.JUDGE_MODEL, a fast Flash-Lite model by default), wrapped in
+LangChain so NeMo can call it.
 
 Set GUARDRAILS=0 to disable (graph.build_graph(guardrails=False)).
 """
@@ -67,7 +68,7 @@ class Guard:
     def __init__(self, api_key: str | None = None):
         api_key = api_key or os.environ.get("GEMINI_API_KEY")
         judge_llm = _GeminiJudge(
-            model=gemini_client.CHAT_MODEL, google_api_key=api_key, temperature=0.0
+            model=gemini_client.JUDGE_MODEL, google_api_key=api_key, temperature=0.0
         )
         config = RailsConfig.from_path(CONFIG_DIR)
         self.rails = LLMRails(config, llm=judge_llm)
